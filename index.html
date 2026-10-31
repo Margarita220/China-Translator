@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <!-- Блокируем случайный зум и стабилизируем интерфейс на смартфонах -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ИИ-Переводчик</title>
+    <!-- Подключаем надежные иконки для микрофона -->
+    <link rel="stylesheet" href="https://cloudflare.com">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body {
+            background-color: #1a1a1a;
+            color: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            padding: 12px;
+        }
+        .main-wrapper {
+            width: 100%;
+            max-width: 600px;
+            background: #222222;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            padding: 16px;
+            margin-top: 5px;
+        }
+        h2 {
+            font-size: 18px;
+            text-align: center;
+            margin-bottom: 16px;
+            color: #e0e0e0;
+        }
+        /* Панель выбора языков в стиле Яндекс */
+        .lang-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #2b2b2b;
+            border-radius: 12px;
+            padding: 2px;
+            margin-bottom: 12px;
+            border: 1px solid #3a3a3a;
+        }
+        .lang-select-wrapper {
+            flex: 1;
+        }
+        .lang-bar select {
+            width: 100%;
+            background: transparent;
+            color: #ffffff;
+            border: none;
+            outline: none;
+            padding: 14px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            appearance: none;
+            text-align-last: center;
+        }
+        .swap-btn {
+            background: transparent;
+            border: none;
+            color: #ff5500;
+            font-size: 18px;
+            width: 44px;
+            height: 44px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        /* Адаптивные блоки: на мобилках строго друг под другом, крупные */
+        .translation-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .pane {
+            position: relative;
+            background: #2b2b2b;
+            border-radius: 12px;
+            border: 1px solid #3a3a3a;
+        }
+        textarea {
+            width: 100%;
+            height: 140px;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #ffffff;
+            padding: 14px;
+            padding-right: 55px; /* Защита от наложения текста на микрофон */
+            font-size: 16px;
+            line-height: 1.4;
+            resize: none;
+            font-family: inherit;
+        }
+        .output-box {
+            width: 100%;
+            min-height: 140px;
+            padding: 14px;
+            font-size: 16px;
+            line-height: 1.4;
+            color: #e0e0e0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        /* Фиксированная, большая кнопка микрофона под палец */
+        .mic-container {
+            position: absolute;
+            right: 8px;
+            top: 8px;
+            z-index: 999;
+        }
+        .mic-btn {
+            background: #3a3a3a;
+            border: none;
+            color: #ffffff;
+            font-size: 20px;
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        .mic-btn.listening {
+            background: #ff5500 !important;
+            color: #ffffff !important;
+            animation: pulseActive 1.2s infinite;
+        }
+        /* Большая кнопка перевода */
+        .action-btn {
+            width: 100%;
+            background: #2ece6d;
+            color: #111111;
+            border: none;
+            outline: none;
+            padding: 16px;
+            font-size: 17px;
+            font-weight: bold;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        /* Крупные плашки подсказок */
+        .examples-header {
+            font-size: 12px;
+            color: #888888;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        .examples-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .example-card {
+            background: #252525;
+            border: 1px solid #333333;
+            border-radius: 10px;
+            padding: 14px;
+            cursor: pointer;
+            font-size: 15px;
+            text-align: left;
+        }
+        .tag-law { color: #ff8800; font-weight: bold; margin-right: 4px; }
+        .tag-idiom { color: #00ccff; font-weight: bold; margin-right: 4px; }
+        .tag-biz { color: #ccff00; font-weight: bold; margin-right: 4px; }
+        
+        @keyframes pulseActive {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.9; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+<div class="main-wrapper">
+    <h2>Кастомный ИИ-переводчик</h2>
+
+    <div class="lang-bar">
+        <div class="lang-select-wrapper">
+            <select id="sourceLang">
+                <option value="zh-CN">Китайский</option>
+                <option value="ru-RU">Русский</option>
+            </select>
+        </div>
+        <button class="swap-btn" id="swapLanguages"><i class="fa-solid fa-right-left"></i></button>
+        <div class="lang-select-wrapper">
+            <select id="targetLang">
+                <option value="ru-RU">Русский</option>
+                <option value="zh-CN">Китайский</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="translation-grid">
+        <div class="pane">
+            <textarea id="inputText" placeholder="Введите текст или надиктуйте фразы..."></textarea>
+            <div class="mic-container">
+                <button class="mic-btn" id="micButton" type="button"><i class="fa-solid fa-microphone"></i></button>
+            </div>
+        </div>
+        <div class="pane" style="background: #232323;">
+            <div class="output-box" id="outputBox">Ожидание запуска перевода...</div>
+        </div>
+    </div>
+
+    <button class="action-btn" id="translateButton">Перевести</button>
+
+    <div class="examples-header">Примеры для быстрой проверки</div>
+    <div class="examples-list">
+        <div class="example-card" onclick="applyExample('人应当设执行董事，也可以设董事会。', 'zh-CN', 'ru-RU')">
+            <span class="tag-law">[Юриспруденция]</span> 人应当设执行董事，也可以设董事会。
+        </div>
+        <div class="example-card" onclick="applyExample('塞翁失马', 'zh-CN', 'ru-RU')">
+            <span class="tag-idiom">[Чэнъюй]</span> 塞翁失马
+        </div>
+        <div class="example-card" onclick="applyExample('我们可以给你挤一点水份', 'zh-CN', 'ru-RU')">
+            <span class="tag-biz">[Н3Д / покупка]</span> 我们可以给你挤一点水份
+        </div>
+    </div>
+</div>
+<script>
+    // Ссылка на ваш рабочий Google Apps Script
+    const webAppUrl = "https://script.googleusercontent.com/macros/echo?user_content_key=AUkAhnQHARo7qfYnQ5evfFZ-pwYMPMfMRu6Y_AiqyDnMQzS7_5attp6ZJNaL1fo3QXooQI8eDw-tQtcUz8dK0bNwEA11UyYBBPixsQWbt54sgZ43ZzxXFBwqJxUw3dVS2t8NIF5MyW8HJWOcNT8rcFxESFEK5SPliAlR4iZQ9EwF2cvHRsyD7c88Fngs2p42_4JJykAoJSIIR31xyb6XaO8K_VTORSs3a-eCQxVIESXk0MRv5_U-2H1VmMyKF14qWOQrPIKxGUD9CKjuwomW0nDlfPWSokxI_A&lib=MrtVffFPJhIiU0mvQwJM5s47LWzdd7hH0";
+
+    const sourceLangSelect = document.getElementById('sourceLang');
+    const targetLangSelect = document.getElementById('targetLang');
+    const swapBtn = document.getElementById('swapLanguages');
+    const inputText = document.getElementById('inputText');
+    const micButton = document.getElementById('micButton');
+    const translateButton = document.getElementById('translateButton');
+    const outputBox = document.getElementById('outputBox');
+
+    swapBtn.addEventListener('click', () => {
+        const temp = sourceLangSelect.value;
+        sourceLangSelect.value = targetLangSelect.value;
+        targetLangSelect.value = temp;
+    });
+
+    function applyExample(text, fromLang, toLang) {
+        inputText.value = text;
+        sourceLangSelect.value = fromLang;
+        targetLangSelect.value = toLang;
+        outputBox.innerText = "Фраза выбрана. Нажмите зеленую кнопку «Перевести»";
+    }
+
+    // Жестко активированная логика микрофона
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let isListening = false;
+    let recognition;
+
+    if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.interimResults = false;
+
+        micButton.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!isListening) {
+                recognition.lang = sourceLangSelect.value;
+                try {
+                    recognition.start();
+                } catch(err) { console.log(err); }
+            } else {
+                recognition.stop();
+            }
+        });
+
+        recognition.onstart = () => {
+            isListening = true;
+            micButton.classList.add('listening');
+            outputBox.innerText = "Идет запись голоса... Говорите";
+        };
+
+        recognition.onend = () => {
+            isListening = false;
+            micButton.classList.remove('listening');
+        };
+
+        recognition.onresult = (event) => {
+            if (event.results && event.results[0]) {
+                inputText.value = event.results[0][0].transcript;
+                outputBox.innerText = "Голос успешно записан! Нажмите «Перевести»";
+            }
+        };
+
+        recognition.onerror = (event) => {
+            isListening = false;
+            micButton.classList.remove('listening');
+            outputBox.innerText = "Ошибка записи. Убедитесь, что дали сайту доступ к микрофону вверху.";
+        };
+    } else {
+        // Если браузер совсем старый, кнопка не исчезнет, но предупредит при клике
+        micButton.addEventListener('click', () => {
+            outputBox.innerText = "Голосовой ввод не поддерживается в этом браузере. Используйте Chrome или Safari.";
+        });
+    }
+
+    // Логика отправки сетевого запроса
+    translateButton.addEventListener('click', () => {
+        const text = inputText.value.trim();
+        if (!text) {
+            outputBox.innerText = "Пожалуйста, введите текст или нажмите на пример.";
+            return;
+        }
+
+        outputBox.innerText = "Связываюсь с ИИ-сервером... Подождите";
+
+        const callbackName = "jsonp_callback_" + Math.round(Math.random() * 1000000);
+        window[callbackName] = function(data) {
+            if (data && data.status === "success") {
+                outputBox.innerText = data.translated;
+            } else {
+                outputBox.innerText = "Ошибка ИИ: " + ((data && data.message) ? data.message : "Неверный ответ от Google Таблицы.");
+            }
+            document.getElementById(callbackName).remove();
+            delete window[callbackName];
+        };
+
+        const script = document.createElement('script');
+        script.id = callbackName;
+        script.src = `${webAppUrl}?text=${encodeURIComponent(text)}&from=${sourceLangSelect.value}&to=${targetLangSelect.value}&callback=${callbackName}`;
+        document.body.appendChild(script);
+    });
+</script>
+</body>
+</html>
